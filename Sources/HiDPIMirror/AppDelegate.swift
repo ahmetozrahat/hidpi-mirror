@@ -179,6 +179,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSMenuDelegate {
 
         if let brightness {
             menu.addItem(.separator())
+            menu.addItem(header("Parlaklık"))
             let slider = BrightnessSlider(level: brightness.level)
             slider.onChange = { [weak self] level in self?.brightness?.set(level) }
             brightnessSlider = slider
