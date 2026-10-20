@@ -88,7 +88,7 @@ final class BrightnessController {
 
     /// Steps like the built-in display: 16 steps, or 64 with fine stepping.
     func step(up: Bool, fine: Bool) {
-        let size = fine ? 1.0 / 64 : 1.0 / 16
+        let size = 1.0 / Double(fine ? BrightnessSlider.steps * 4 : BrightnessSlider.steps)
         let steps = (level / size).rounded()
         set((steps + (up ? 1 : -1)) * size)
     }
