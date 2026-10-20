@@ -68,6 +68,11 @@ final class MirrorController {
         var config: CGDisplayConfigRef?
         try check(CGBeginDisplayConfiguration(&config))
         CGConfigureDisplayWithDisplayMode(config, virtual.displayID, mode, nil)
+        // The panel must run at its native resolution while mirroring, or the 2x image is
+        // downsampled to a scaled mode and comes out blurry.
+        if let native = lowResolutionMode(of: physical, width: physical.pixelWidth, height: physical.pixelHeight) {
+            CGConfigureDisplayWithDisplayMode(config, physical.id, native, nil)
+        }
         CGConfigureDisplayMirrorOfDisplay(config, physical.id, virtual.displayID)
         // .forSession: nothing is persisted, so a crash or quit leaves the panel untouched.
         let result = CGCompleteDisplayConfiguration(config, .forSession)
@@ -78,11 +83,17 @@ final class MirrorController {
         resolution = (width, height)
     }
 
+    /// Ends mirroring. The panel keeps the same "looks like" size in a regular (non-HiDPI) mode
+    /// when it has one, so turning HiDPI off doesn't suddenly shrink or enlarge everything.
     func stop() {
         if let physical, CGDisplayIsOnline(physical.id) != 0 {
             var config: CGDisplayConfigRef?
             if CGBeginDisplayConfiguration(&config) == .success {
                 CGConfigureDisplayMirrorOfDisplay(config, physical.id, kCGNullDirectDisplay)
+                if let resolution,
+                   let mode = lowResolutionMode(of: physical, width: resolution.width, height: resolution.height) {
+                    CGConfigureDisplayWithDisplayMode(config, physical.id, mode, nil)
+                }
                 if CGCompleteDisplayConfiguration(config, .forSession) != .success {
                     CGCancelDisplayConfiguration(config)
                 }
@@ -159,6 +170,15 @@ final class MirrorController {
     func allModes(of id: CGDirectDisplayID) -> [CGDisplayMode] {
         let options = [kCGDisplayShowDuplicateLowResolutionModes: kCFBooleanTrue] as CFDictionary
         return CGDisplayCopyAllDisplayModes(id, options) as? [CGDisplayMode] ?? []
+    }
+
+    /// A 1x mode of the given size on the physical panel, at its current refresh rate if possible.
+    private func lowResolutionMode(of display: PhysicalDisplay, width: Int, height: Int) -> CGDisplayMode? {
+        let candidates = allModes(of: display.id).filter {
+            $0.width == width && $0.height == height && $0.pixelWidth == width && $0.isUsableForDesktopGUI()
+        }
+        return candidates.first { $0.refreshRate == display.refreshRate }
+            ?? candidates.max { $0.refreshRate < $1.refreshRate }
     }
 
     private func hiDPIMode(of id: CGDirectDisplayID, width: Int, height: Int) -> CGDisplayMode? {
