@@ -28,6 +28,24 @@ if CommandLine.arguments.contains("--probe") {
     exit(status)
 }
 
+// `--ddc [value]`: read the external panel's brightness over DDC, optionally setting it first.
+if let index = CommandLine.arguments.firstIndex(of: "--ddc") {
+    guard let display = PhysicalDisplay.onlineExternal().first, let ddc = DDCDisplay.find(for: display) else {
+        print("DDC servisi bulunamadı.")
+        exit(1)
+    }
+    if CommandLine.arguments.count > index + 1, let value = UInt16(CommandLine.arguments[index + 1]) {
+        print("Yaz \(value): \(ddc.write(.brightness, value: value) ? "tamam" : "başarısız")")
+    }
+    if let reading = ddc.read(.brightness) {
+        print("Parlaklık: \(reading.current) / \(reading.max)")
+    } else {
+        print("Okuma başarısız.")
+        exit(1)
+    }
+    exit(0)
+}
+
 let delegate = AppDelegate()
 app.delegate = delegate
 app.setActivationPolicy(.accessory)

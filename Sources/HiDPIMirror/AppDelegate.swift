@@ -8,12 +8,18 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSMenuDelegate {
     private var hotKey: HotKey?
     private var lastError: String?
     private var signalSources: [DispatchSourceSignal] = []
+    private var brightness: BrightnessController?
+    private var mediaKeys: MediaKeyTap!
+    private let hud = BrightnessHUD()
+    private weak var brightnessSlider: NSSlider?
 
     private enum Key {
         static let enabled = "enabled"
         static let displayKey = "displayKey"
         static let width = "width"
         static let height = "height"
+        static let brightness = "brightness"
+        static let brightnessKeys = "brightnessKeys"
     }
 
     // MARK: - Lifecycle
@@ -31,6 +37,15 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSMenuDelegate {
 
         installSignalHandlers()
 
+        defaults.register(defaults: [Key.brightnessKeys: true])
+        mediaKeys = MediaKeyTap { [weak self] up, fine in
+            guard let self, let brightness = self.brightness else { return false }
+            brightness.step(up: up, fine: fine)
+            self.hud.show(level: brightness.level)
+            return true
+        }
+        if defaults.bool(forKey: Key.brightnessKeys) { mediaKeys.start(prompt: true) }
+
         NotificationCenter.default.addObserver(
             self, selector: #selector(screensChanged),
             name: NSApplication.didChangeScreenParametersNotification, object: nil
@@ -41,6 +56,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSMenuDelegate {
         )
 
         if defaults.bool(forKey: Key.enabled) { enable() }
+        refreshBrightness()
         updateIcon()
     }
 
@@ -90,6 +106,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSMenuDelegate {
         } catch {
             lastError = error.localizedDescription
         }
+        refreshBrightness()
         updateIcon()
     }
 
@@ -106,11 +123,27 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSMenuDelegate {
     }
 
     @objc private func screensChanged() {
-        guard controller.isActive, let physical = controller.physical else { return }
         // The panel was unplugged: drop the virtual display so windows don't strand on it.
-        if !PhysicalDisplay.onlineExternal().contains(where: { $0.key == physical.key }) {
+        if let physical = controller.physical,
+           !PhysicalDisplay.onlineExternal().contains(where: { $0.key == physical.key }) {
             controller.stop()
             updateIcon()
+        }
+        refreshBrightness()
+    }
+
+    /// Points brightness control at the panel in use, recreating it after reconnects or a display switch.
+    private func refreshBrightness() {
+        guard let display = controller.physical ?? preferredDisplay() else {
+            brightness = nil
+            return
+        }
+        guard brightness?.displayKey != display.key else { return }
+        let saved = defaults.object(forKey: Key.brightness) as? Double
+        brightness = BrightnessController(display: display, savedLevel: saved)
+        brightness?.onChange = { [weak self] level in
+            self?.defaults.set(level, forKey: Key.brightness)
+            self?.brightnessSlider?.doubleValue = level
         }
     }
 
@@ -143,6 +176,14 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSMenuDelegate {
         toggleItem.keyEquivalentModifierMask = [.control, .option, .command]
         toggleItem.target = self
         menu.addItem(toggleItem)
+
+        if let brightness {
+            menu.addItem(.separator())
+            menu.addItem(header("Parlaklık"))
+            let item = NSMenuItem()
+            item.view = brightnessView(level: brightness.level)
+            menu.addItem(item)
+        }
 
         let displays = PhysicalDisplay.onlineExternal()
         guard let current = controller.physical ?? preferredDisplay() else {
@@ -186,6 +227,10 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSMenuDelegate {
         login.target = self
         login.state = SMAppService.mainApp.status == .enabled ? .on : .off
         menu.addItem(login)
+        let keys = NSMenuItem(title: "Parlaklık tuşlarını kullan", action: #selector(toggleBrightnessKeys), keyEquivalent: "")
+        keys.target = self
+        keys.state = defaults.bool(forKey: Key.brightnessKeys) ? .on : .off
+        menu.addItem(keys)
         menu.addItem(NSMenuItem(title: "Çık", action: #selector(NSApplication.terminate(_:)), keyEquivalent: "q"))
     }
 
@@ -193,6 +238,38 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSMenuDelegate {
         let item = NSMenuItem(title: title, action: nil, keyEquivalent: "")
         item.isEnabled = false
         return item
+    }
+
+    private func brightnessView(level: Double) -> NSView {
+        let view = NSView(frame: NSRect(x: 0, y: 0, width: 260, height: 30))
+        let low = NSImageView(frame: NSRect(x: 16, y: 7, width: 16, height: 16))
+        low.image = NSImage(systemSymbolName: "sun.min", accessibilityDescription: nil)
+        low.contentTintColor = .secondaryLabelColor
+        let high = NSImageView(frame: NSRect(x: 228, y: 7, width: 16, height: 16))
+        high.image = NSImage(systemSymbolName: "sun.max", accessibilityDescription: nil)
+        high.contentTintColor = .secondaryLabelColor
+
+        let slider = NSSlider(value: level, minValue: 0, maxValue: 1, target: self, action: #selector(brightnessSliderChanged(_:)))
+        slider.frame = NSRect(x: 38, y: 5, width: 184, height: 20)
+        slider.isContinuous = true
+        brightnessSlider = slider
+
+        [low, slider, high].forEach(view.addSubview)
+        return view
+    }
+
+    @objc private func brightnessSliderChanged(_ sender: NSSlider) {
+        brightness?.set(sender.doubleValue)
+    }
+
+    @objc private func toggleBrightnessKeys() {
+        let enabled = !defaults.bool(forKey: Key.brightnessKeys)
+        defaults.set(enabled, forKey: Key.brightnessKeys)
+        if enabled {
+            mediaKeys.start(prompt: true)
+        } else {
+            mediaKeys.stop()
+        }
     }
 
     @objc private func toggleFromMenu() { toggle() }

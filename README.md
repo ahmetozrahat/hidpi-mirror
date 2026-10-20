@@ -23,6 +23,14 @@ open ~/Applications/"HiDPI Mirror.app"
 - **⌃⌥⌘H** her yerden aç/kapat. Görüntü bozulursa önce bunu dene.
 - Ayarlar (açık/kapalı, ekran, boyut) hatırlanır, uykudan uyanınca yeniden uygulanır.
 
+## Parlaklık
+
+Aynalama sırasında macOS ve başka uygulamalar (ör. Vorssaint) fiziksel monitörü göremez, bu yüzden parlaklık bu uygulamada.
+
+- Menüdeki kaydırıcı ve klavyedeki parlaklık tuşları (F1/F2) monitörün kendi parlaklığını DDC/CI ile değiştirir. ⌥⇧ ile çeyrek adım.
+- Tuşlar için **Erişilebilirlik** izni gerekir (Sistem Ayarları → Gizlilik ve Güvenlik → Erişilebilirlik). İzin imzaya bağlı. `build.sh` uygulamayı Developer ID ile imzaladığı için yeniden derlemede izin kaybolmaz.
+- Başka bir uygulama da parlaklık tuşlarını dinliyorsa ondaki ekran/parlaklık kontrolünü kapat, yoksa iki uygulama aynı anda yazar.
+
 ## Teşhis
 
 ```sh
@@ -30,6 +38,11 @@ open ~/Applications/"HiDPI Mirror.app"
 ```
 
 Monitöre dokunmadan sanal ekranı oluşturur, modlarını listeler ve kaldırır. macOS güncellemesinden sonra API'nin hâlâ çalıştığını kontrol etmek için kullanılır.
+
+```sh
+.build/release/HiDPIMirror --ddc        # parlaklığı DDC ile oku
+.build/release/HiDPIMirror --ddc 60     # 60'a ayarla, sonra oku
+```
 
 ## Bilinen sınırlamalar
 

@@ -1,4 +1,4 @@
-import CGVirtualDisplayPrivate
+import PrivateAPIs
 import AppKit
 import CoreGraphics
 import Foundation

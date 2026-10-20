@@ -6,16 +6,17 @@ let package = Package(
     platforms: [.macOS(.v14)],
     targets: [
         .target(
-            name: "CGVirtualDisplayPrivate",
-            path: "Sources/CGVirtualDisplayPrivate"
+            name: "PrivateAPIs",
+            path: "Sources/PrivateAPIs"
         ),
         .executableTarget(
             name: "HiDPIMirror",
-            dependencies: ["CGVirtualDisplayPrivate"],
+            dependencies: ["PrivateAPIs"],
             path: "Sources/HiDPIMirror",
             linkerSettings: [
                 .linkedFramework("AppKit"),
                 .linkedFramework("CoreGraphics"),
+                .linkedFramework("IOKit"),
                 .linkedFramework("Carbon"),
                 .linkedFramework("ServiceManagement"),
             ]
