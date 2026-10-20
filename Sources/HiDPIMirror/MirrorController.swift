@@ -65,14 +65,18 @@ final class MirrorController {
             throw MirrorError.noHiDPIMode(width: width, height: height)
         }
 
+        // The panel must run at its native resolution while mirroring, or the 2x image is
+        // downsampled to a scaled mode and comes out blurry. This has to be its own
+        // configuration: changing a display's mode while mirroring it is rejected (1010).
+        if CGDisplayMirrorsDisplay(physical.id) == kCGNullDirectDisplay,
+           let current = CGDisplayCopyDisplayMode(physical.id), current.pixelWidth != physical.pixelWidth,
+           let native = lowResolutionMode(of: physical, width: physical.pixelWidth, height: physical.pixelHeight) {
+            try configure { CGConfigureDisplayWithDisplayMode($0, physical.id, native, nil) }
+        }
+
         var config: CGDisplayConfigRef?
         try check(CGBeginDisplayConfiguration(&config))
         CGConfigureDisplayWithDisplayMode(config, virtual.displayID, mode, nil)
-        // The panel must run at its native resolution while mirroring, or the 2x image is
-        // downsampled to a scaled mode and comes out blurry.
-        if let native = lowResolutionMode(of: physical, width: physical.pixelWidth, height: physical.pixelHeight) {
-            CGConfigureDisplayWithDisplayMode(config, physical.id, native, nil)
-        }
         CGConfigureDisplayMirrorOfDisplay(config, physical.id, virtual.displayID)
         // .forSession: nothing is persisted, so a crash or quit leaves the panel untouched.
         let result = CGCompleteDisplayConfiguration(config, .forSession)
@@ -87,16 +91,11 @@ final class MirrorController {
     /// when it has one, so turning HiDPI off doesn't suddenly shrink or enlarge everything.
     func stop() {
         if let physical, CGDisplayIsOnline(physical.id) != 0 {
-            var config: CGDisplayConfigRef?
-            if CGBeginDisplayConfiguration(&config) == .success {
-                CGConfigureDisplayMirrorOfDisplay(config, physical.id, kCGNullDirectDisplay)
-                if let resolution,
-                   let mode = lowResolutionMode(of: physical, width: resolution.width, height: resolution.height) {
-                    CGConfigureDisplayWithDisplayMode(config, physical.id, mode, nil)
-                }
-                if CGCompleteDisplayConfiguration(config, .forSession) != .success {
-                    CGCancelDisplayConfiguration(config)
-                }
+            try? configure { CGConfigureDisplayMirrorOfDisplay($0, physical.id, kCGNullDirectDisplay) }
+            // Separate step, for the same reason as in apply().
+            if let resolution,
+               let mode = lowResolutionMode(of: physical, width: resolution.width, height: resolution.height) {
+                try? configure { CGConfigureDisplayWithDisplayMode($0, physical.id, mode, nil) }
             }
         }
         // Releasing the object removes the virtual display from the system.
@@ -185,6 +184,18 @@ final class MirrorController {
         allModes(of: id)
             .filter { $0.width == width && $0.height == height && $0.pixelWidth == width * 2 }
             .max { $0.refreshRate < $1.refreshRate }
+    }
+
+    /// Runs one display configuration transaction for the session.
+    private func configure(_ body: (CGDisplayConfigRef?) -> Void) throws {
+        var config: CGDisplayConfigRef?
+        try check(CGBeginDisplayConfiguration(&config))
+        body(config)
+        let result = CGCompleteDisplayConfiguration(config, .forSession)
+        guard result == .success else {
+            CGCancelDisplayConfiguration(config)
+            throw MirrorError.configuration(result)
+        }
     }
 
     private func check(_ error: CGError) throws {
