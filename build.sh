@@ -14,13 +14,17 @@ APP="build/HiDPI Mirror.app"
 rm -rf "$APP"
 mkdir -p "$APP/Contents/MacOS"
 cp .build/release/HiDPIMirror "$APP/Contents/MacOS/"
+# SwiftPM stamps the binary with the deployment target as its SDK version, and AppKit then runs
+# it in compatibility mode: no Liquid Glass. Record the SDK it was really built against.
+vtool -set-build-version macos 14.0 "$(xcrun --show-sdk-version)" -replace \
+    -output "$APP/Contents/MacOS/HiDPIMirror" "$APP/Contents/MacOS/HiDPIMirror"
 cp Resources/Info.plist "$APP/Contents/"
 IDENTITY="${SIGN_IDENTITY:-$(security find-identity -v -p codesigning | awk '/Developer ID Application/ { print $2; exit }')}"
 codesign --force --sign "${IDENTITY:--}" "$APP"
 echo "Built $APP (signed: ${IDENTITY:-ad-hoc})"
 
 if [[ "${1:-}" == "--install" ]]; then
-    pkill -x HiDPIMirror && sleep 1 || true
+    pkill -x HiDPIMirror && while pgrep -x HiDPIMirror >/dev/null; do sleep 0.2; done || true
     mkdir -p ~/Applications
     rm -rf ~/Applications/"HiDPI Mirror.app"
     cp -R "$APP" ~/Applications/
