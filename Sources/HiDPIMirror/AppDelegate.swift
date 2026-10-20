@@ -41,7 +41,10 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSMenuDelegate {
         mediaKeys = MediaKeyTap { [weak self] up, fine in
             guard let self, let brightness = self.brightness else { return false }
             brightness.step(up: up, fine: fine)
-            self.hud.show(level: brightness.level)
+            self.hud.show(
+                level: brightness.level, title: brightness.displayName,
+                anchor: self.statusItem.button?.window?.frame
+            )
             return true
         }
         if defaults.bool(forKey: Key.brightnessKeys) { mediaKeys.start(prompt: true) }

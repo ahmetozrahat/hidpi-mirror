@@ -5,6 +5,7 @@ import Foundation
 /// value is sent, and once input settles it is sent again in case the monitor dropped it.
 final class BrightnessController {
     let displayKey: String
+    let displayName: String
     private let ddc: DDCDisplay
     private let queue = DispatchQueue(label: "hidpi-mirror.ddc")
     // `pending`, `draining` and `confirm` are shared with the main thread; `lastWritten` is queue-only.
@@ -27,6 +28,7 @@ final class BrightnessController {
         guard let ddc = DDCDisplay.find(for: display) else { return nil }
         self.ddc = ddc
         displayKey = display.key
+        displayName = display.name
         level = savedLevel ?? 0.5
 
         queue.async { [weak self] in
