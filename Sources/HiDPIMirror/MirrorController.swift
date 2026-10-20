@@ -1,4 +1,5 @@
 import CGVirtualDisplayPrivate
+import AppKit
 import CoreGraphics
 import Foundation
 
@@ -146,7 +147,7 @@ final class MirrorController {
         let deadline = Date().addingTimeInterval(5)
         while Date() < deadline {
             if CGDisplayIsOnline(id) != 0, hasAnyMode(id) { return }
-            RunLoop.current.run(until: Date().addingTimeInterval(0.05))
+            if let event = NSApp?.nextEvent(matching: .any, until: Date().addingTimeInterval(0.05), inMode: .default, dequeue: true) { NSApp.sendEvent(event) }
         }
         throw MirrorError.virtualDisplayNeverAppeared
     }

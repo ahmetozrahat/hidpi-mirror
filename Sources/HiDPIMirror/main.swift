@@ -5,6 +5,8 @@ let app = NSApplication.shared
 // `--probe`: create the virtual display without mirroring, list its modes, then remove it.
 // Useful after macOS updates to check the private API still behaves.
 if CommandLine.arguments.contains("--probe") {
+    app.setActivationPolicy(.accessory)
+    app.finishLaunching()
     guard let display = PhysicalDisplay.onlineExternal().first else {
         print("Harici ekran yok.")
         exit(1)
