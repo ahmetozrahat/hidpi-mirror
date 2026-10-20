@@ -86,6 +86,13 @@ final class BrightnessController {
         queue.asyncAfter(deadline: .now() + confirmDelay, execute: work)
     }
 
+    /// Sends the current level again even if it matches the last write. Monitors reset their own
+    /// brightness when they wake from sleep, while `lastWritten` still says they are in sync.
+    func reapply() {
+        queue.async { [weak self] in self?.lastWritten = nil }
+        set(level)
+    }
+
     /// Steps like the built-in display: 16 steps, or 64 with fine stepping.
     func step(up: Bool, fine: Bool) {
         let size = 1.0 / Double(fine ? BrightnessSlider.steps * 4 : BrightnessSlider.steps)

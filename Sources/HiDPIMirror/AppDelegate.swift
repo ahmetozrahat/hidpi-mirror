@@ -54,6 +54,10 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSMenuDelegate {
             self, selector: #selector(didWake),
             name: NSWorkspace.didWakeNotification, object: nil
         )
+        NSWorkspace.shared.notificationCenter.addObserver(
+            self, selector: #selector(screensDidWake),
+            name: NSWorkspace.screensDidWakeNotification, object: nil
+        )
 
         if defaults.bool(forKey: Key.enabled) { enable() }
         refreshBrightness()
@@ -144,6 +148,16 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSMenuDelegate {
         brightness?.onChange = { [weak self] level in
             self?.defaults.set(level, forKey: Key.brightness)
             self?.brightnessSlider?.level = level
+        }
+    }
+
+    @objc private func screensDidWake() {
+        // The panel comes back at its own brightness; push ours again once it accepts DDC.
+        // A few tries, since panels take a variable while to wake up after the signal returns.
+        for delay in [1.0, 3.0, 6.0] {
+            DispatchQueue.main.asyncAfter(deadline: .now() + delay) { [weak self] in
+                self?.brightness?.reapply()
+            }
         }
     }
 
