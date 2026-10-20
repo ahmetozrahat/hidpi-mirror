@@ -11,7 +11,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSMenuDelegate {
     private var brightness: BrightnessController?
     private var mediaKeys: MediaKeyTap!
     private let hud = BrightnessHUD()
-    private weak var brightnessSlider: NSSlider?
+    private weak var brightnessSlider: BrightnessSlider?
 
     private enum Key {
         static let enabled = "enabled"
@@ -143,7 +143,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSMenuDelegate {
         brightness = BrightnessController(display: display, savedLevel: saved)
         brightness?.onChange = { [weak self] level in
             self?.defaults.set(level, forKey: Key.brightness)
-            self?.brightnessSlider?.doubleValue = level
+            self?.brightnessSlider?.level = level
         }
     }
 
@@ -179,9 +179,11 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSMenuDelegate {
 
         if let brightness {
             menu.addItem(.separator())
-            menu.addItem(header("Parlaklık"))
+            let slider = BrightnessSlider(level: brightness.level)
+            slider.onChange = { [weak self] level in self?.brightness?.set(level) }
+            brightnessSlider = slider
             let item = NSMenuItem()
-            item.view = brightnessView(level: brightness.level)
+            item.view = slider
             menu.addItem(item)
         }
 
@@ -238,28 +240,6 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSMenuDelegate {
         let item = NSMenuItem(title: title, action: nil, keyEquivalent: "")
         item.isEnabled = false
         return item
-    }
-
-    private func brightnessView(level: Double) -> NSView {
-        let view = NSView(frame: NSRect(x: 0, y: 0, width: 260, height: 30))
-        let low = NSImageView(frame: NSRect(x: 16, y: 7, width: 16, height: 16))
-        low.image = NSImage(systemSymbolName: "sun.min", accessibilityDescription: nil)
-        low.contentTintColor = .secondaryLabelColor
-        let high = NSImageView(frame: NSRect(x: 228, y: 7, width: 16, height: 16))
-        high.image = NSImage(systemSymbolName: "sun.max", accessibilityDescription: nil)
-        high.contentTintColor = .secondaryLabelColor
-
-        let slider = NSSlider(value: level, minValue: 0, maxValue: 1, target: self, action: #selector(brightnessSliderChanged(_:)))
-        slider.frame = NSRect(x: 38, y: 5, width: 184, height: 20)
-        slider.isContinuous = true
-        brightnessSlider = slider
-
-        [low, slider, high].forEach(view.addSubview)
-        return view
-    }
-
-    @objc private func brightnessSliderChanged(_ sender: NSSlider) {
-        brightness?.set(sender.doubleValue)
     }
 
     @objc private func toggleBrightnessKeys() {

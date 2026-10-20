@@ -60,15 +60,7 @@ final class DDCDisplay {
     func write(_ vcp: VCP, value: UInt16) -> Bool {
         var packet: [UInt8] = [0x84, 0x03, vcp.rawValue, UInt8(value >> 8), UInt8(value & 0xFF)]
         packet.append(checksum(packet))
-        // Some monitors drop single writes; sending twice is what MonitorControl and m1ddc do.
-        var succeeded = false
-        for _ in 0..<2 {
-            if IOAVServiceWriteI2C(service, 0x37, 0x51, &packet, UInt32(packet.count)) == kIOReturnSuccess {
-                succeeded = true
-            }
-            usleep(10_000)
-        }
-        return succeeded
+        return IOAVServiceWriteI2C(service, 0x37, 0x51, &packet, UInt32(packet.count)) == kIOReturnSuccess
     }
 
     func read(_ vcp: VCP) -> (current: UInt16, max: UInt16)? {
